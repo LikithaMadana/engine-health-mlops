@@ -1,0 +1,247 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, develop, copilot/develop-mlops-pipeline ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: Lint & Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 black isort
+          
+      - name: Lint with flake8
+        run: |
+          # Stop the build if there are Python syntax errors or undefined names
+          flake8 src/ tests/ api/ --count --select=E9,F63,F7,F82 --show-source --statistics
+          # Exit-zero treats all errors as warnings
+          flake8 src/ tests/ api/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+          
+      - name: Check formatting with black
+        run: |
+          black --check --diff src/ tests/ api/
+        continue-on-error: true
+          
+      - name: Check import sorting with isort
+        run: |
+          isort --check-only --diff src/ tests/ api/
+        continue-on-error: true
+
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.8', '3.9', '3.10']
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-xdist
+          
+      - name: Run tests with pytest
+        run: |
+          pytest tests/ -v --cov=src --cov-report=xml --cov-report=term-missing
+          
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+          
+      - name: Install security tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install bandit safety
+          
+      - name: Run Bandit security scan
+        run: |
+          bandit -r src/ api/ -f json -o bandit-report.json || true
+          bandit -r src/ api/ -ll
+        continue-on-error: true
+          
+      - name: Check dependencies for known vulnerabilities
+        run: |
+          pip install -r requirements.txt
+          safety check --json || true
+        continue-on-error: true
+
+  docker:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        
+      - name: Build Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: false
+          tags: engine-health-mlops:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          
+      - name: Test Docker image
+        run: |
+          docker run --rm engine-health-mlops:test python -c "import torch; import xgboost; import mlflow; print('Dependencies OK')"
+
+  documentation:
+    name: Documentation Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Check README exists and is not empty
+        run: |
+          if [ ! -f README.md ]; then
+            echo "README.md not found"
+            exit 1
+          fi
+          if [ ! -s README.md ]; then
+            echo "README.md is empty"
+            exit 1
+          fi
+          echo "README.md exists and has content"
+          
+      - name: Check documentation files
+        run: |
+          required_docs=(
+            "README.md"
+            "CONTRIBUTING.md"
+            "LICENSE"
+          )
+          for doc in "${required_docs[@]}"; do
+            if [ ! -f "$doc" ]; then
+              echo "Warning: $doc not found"
+            else
+              echo "✓ $doc found"
+            fi
+          done
+          
+      - name: Validate YAML files
+        run: |
+          # Install yq for YAML validation
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+          
+          # Validate all YAML files
+          for yaml_file in $(find . -name "*.yaml" -o -name "*.yml"); do
+            echo "Validating $yaml_file"
+            yq eval '.' "$yaml_file" > /dev/null || echo "Warning: $yaml_file may have issues"
+          done
+
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          
+      - name: Test data preprocessing
+        run: |
+          python -c "
+          from src.data.preprocessing import EngineDataPreprocessor
+          import numpy as np
+          
+          preprocessor = EngineDataPreprocessor()
+          data = np.random.randn(100, 14)
+          labels = np.random.randint(0, 2, 100)
+          
+          X_train, X_test, y_train, y_test = preprocessor.prepare_data(
+              data, labels, window_size=10, test_size=0.2
+          )
+          print(f'✓ Data preprocessing works: {X_train.shape}')
+          "
+          
+      - name: Test model imports
+        run: |
+          python -c "
+          from src.models.cnn_model import EngineCNN
+          from src.models.xgboost_model import EngineXGBoost
+          import torch
+          
+          cnn = EngineCNN(input_channels=14, num_classes=2)
+          print(f'✓ CNN model created: {sum(p.numel() for p in cnn.parameters())} params')
+          
+          xgb = EngineXGBoost(n_features=14)
+          print('✓ XGBoost model created')
+          "
+          
+      - name: Test API endpoints
+        run: |
+          python -c "
+          from api.inference import app
+          from fastapi.testclient import TestClient
+          
+          client = TestClient(app)
+          response = client.get('/health')
+          assert response.status_code == 200
+          print('✓ API health endpoint works')
+          "
+
+  all-checks-passed:
+    name: All Checks Passed
+    runs-on: ubuntu-latest
+    needs: [lint, test, security, docker, documentation, integration]
+    steps:
+      - name: All checks passed
+        run: |
+          echo " All CI checks passed successfully!"
+          echo "Ready for deployment"

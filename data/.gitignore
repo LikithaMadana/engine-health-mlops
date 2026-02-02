@@ -1,0 +1,29 @@
+# Ignore all data files in this directory
+# Data should not be committed to git
+
+# Raw data files
+raw/*.csv
+raw/*.txt
+raw/*.json
+raw/*.parquet
+raw/*.npy
+raw/*.npz
+raw/*.pkl
+raw/*.h5
+raw/*.hdf5
+
+# Processed data files
+processed/*.csv
+processed/*.npy
+processed/*.npz
+processed/*.pkl
+processed/*.h5
+processed/*.hdf5
+
+# Keep directory structure
+!raw/.gitkeep
+!processed/.gitkeep
+
+# But allow README files
+!README.md
+!*/README.md

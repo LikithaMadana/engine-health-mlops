@@ -1,0 +1,121 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# MLflow
+mlruns/
+mlartifacts/
+
+# Model artifacts (trained models, not source code)
+/models/
+*.pkl
+*.pth
+*.h5
+
+# Data files (datasets, not source code)
+# Allow data directory structure but ignore actual data files
+data/**/*.csv
+data/**/*.parquet
+data/**/*.npy
+data/**/*.npz
+data/**/*.pkl
+data/**/*.h5
+data/**/*.hdf5
+data/**/*.txt
+data/**/*.json
+# But keep README and .gitkeep files
+!data/**/README.md
+!data/**/.gitkeep
+# Allow COMPREDICT-provided case study data
+!data/raw/engine_data.csv
+
+# Logs
+logs/
+*.log
+
+# Environment variables and secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+!.env.*.example
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Pytest
+.pytest_cache/
+
+# Coverage
+htmlcov/
+.coverage
+.coverage.*
+
+# Docker
+*.tar
+
+# Optuna
+optuna_studies/
+*.db
+
+# Kubeflow
+.kfp/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Runtime outputs
+outputs/
+*.log
+*.txt
+confusion_matrix.png
+training_loss.png
+
+# MLflow
+mlruns/
+mlartifacts/
+
+# Model artifacts
+models/*.pth
+models/*.pkl
+*.pth
+*.pkl
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Generated Kubeflow pipeline YAMLs (regenerate from pipeline.py)
+complete_engine_health_pipeline.yaml
+kubeflow_pipeline/complete_engine_health_pipeline.yaml

@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  # MLflow tracking server
+  mlflow:
+    image: python:3.9-slim
+    container_name: mlflow-server
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./mlruns:/mlruns
+      - ./mlartifacts:/mlartifacts
+    command: >
+      bash -c "pip install mlflow &&
+               mlflow server
+               --host 0.0.0.0
+               --port 5000
+               --backend-store-uri sqlite:///mlflow.db
+               --default-artifact-root /mlartifacts"
+    networks:
+      - engine-health-net
+
+  # Inference API
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: engine-health-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./models:/app/models
+    environment:
+      - CNN_MODEL_PATH=/app/models/cnn_model.pth
+      - XGB_MODEL_PATH=/app/models/xgb_model.pkl
+    depends_on:
+      - mlflow
+    networks:
+      - engine-health-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  engine-health-net:
+    driver: bridge
+
+volumes:
+  mlruns:
+  mlartifacts:

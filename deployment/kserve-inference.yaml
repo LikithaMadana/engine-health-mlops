@@ -1,0 +1,72 @@
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: engine-health-cnn
+spec:
+  predictor:
+    minReplicas: 1
+    maxReplicas: 5
+    containers:
+    - name: kserve-container
+      image: engine-health-mlops:latest
+      env:
+      - name: STORAGE_URI
+        value: "gs://your-bucket/models/cnn"
+      - name: MODEL_NAME
+        value: "cnn_model"
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "512Mi"
+        limits:
+          cpu: "2"
+          memory: "2Gi"
+---
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: engine-health-xgboost
+spec:
+  predictor:
+    minReplicas: 1
+    maxReplicas: 5
+    containers:
+    - name: kserve-container
+      image: engine-health-mlops:latest
+      env:
+      - name: STORAGE_URI
+        value: "gs://your-bucket/models/xgboost"
+      - name: MODEL_NAME
+        value: "xgb_model"
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "512Mi"
+        limits:
+          cpu: "2"
+          memory: "2Gi"
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: engine-health-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: engine-health-deployment
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
