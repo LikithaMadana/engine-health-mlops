@@ -78,18 +78,23 @@ def preprocess_data(
         X = X[indices]
         y = y[indices]
         
+    elif data_source == "real":
+        # Load real data from 'data/raw/engine_data.csv'
+        print("Loading real data from: data/raw/engine_data.csv")
+        df = pd.read_csv("data/raw/engine_data.csv")
+        
+        # Validate the data structure
+        if 'target' not in df.columns:
+            raise ValueError("The input CSV must contain a 'target' column.")
+        
+        # Assign features and target
+        X = df.drop('target', axis=1).values
+        y = df['target'].values
     else:
-        # Load real data from file/database
-        print(f"Loading real data from: {data_source}")
-        # In production, implement actual data loading:
-        # df = pd.read_csv(data_source)
-        # X = df.drop('target', axis=1).values
-        # y = df['target'].values
-        raise NotImplementedError(
-            "Real data loading not yet implemented. "
-            "In production, load from CSV/database and extract features and labels. "
-            "Expected format: CSV with features and 'target' column (0=healthy, 1=unhealthy)"
+        raise ValueError(
+            "Unsupported data_source. Use 'synthetic' for synthetic data or 'real' for actual data from 'data/raw/engine_data.csv'."
         )
+    
     
     # Split data
     X_train, X_test, y_train, y_test = train_test_split(
@@ -876,7 +881,7 @@ def complete_engine_health_pipeline(
     test_size: float = 0.2,
     n_tuning_trials: int = 10,
     primary_metric: str = "f1_score",
-    data_source: str = "synthetic"
+    data_source: str = "real"
 ):
     # Step 1: Preprocess data + Feature Engineering
     preprocess_task = preprocess_data(
